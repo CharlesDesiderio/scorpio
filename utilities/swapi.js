@@ -13,8 +13,8 @@ module.exports = (client) => {
 	    stats:stats,
 	    calcStats:calcStats,
 	    units:units,
-		player:player,
-		guild:guild,
+		player:getplayer,
+		guild:getguild,
 		register:register,
 		unregister:unregister,
 		whois:whois,
@@ -163,14 +163,24 @@ async function units( ids, language ) {
  *  @id - allycode or discordId (! discord Id requires patreon-tier api user)
  *  @language - language code for reply
  */
-async function player( id, language ) {
+async function getplayer( id, language ) {
 	
 	try {
     	
-		let allycode = id.toString().match(/^\d{9}$/) ? parseInt(id.toString().match(/\d{9}/)[0]) : null;
-		let discordId = id.toString().match(/^\d{17,18}$/) ? id.toString().match(/^\d{17,18}$/)[0] : null;
+    	let allycodes = null;
+    	let discordIds = null;
+    	
+    	if( Array.isArray(id) ) {
+    	    allycodes = id.filter(i => i.toString().length === 9);
+    	    discordIds = id.filter(i => i.toString().length > 9);
+    	} else {
+    	    allycodes = id.toString().match(/^\d{9}$/) ? parseInt(id.toString().match(/\d{9}/)[0]) : null;
+    	    allycodes = allycodes ? [ allycodes ] : [];
+    	    discordIds = id.toString().match(/^\d{17,18}$/) ? id.toString().match(/^\d{17,18}$/)[0] : null;
+    	    discordIds = discordIds ? [ discordIds ] : [];
+		}
 		
-		if( !allycode && !discordId ) { 
+		if( !allycodes && !discordIds ) { 
 			throw new Error('Please provide a valid allycode'); 
 		}
 		
@@ -179,8 +189,8 @@ async function player( id, language ) {
 
 
 		/** Get player from cache */
-		let player = allycode ?
-			await cache.get('swapi', 'players', {allyCode:allycode, updated:{ $gte:expiredDate.getTime() }}) :
+		let player = allycodes && allycodes.length > 0 ?
+			await cache.get('swapi', 'players', {allyCode:{ "$in":allycodes }, updated:{ $gte:expiredDate.getTime() }}) :
 			null;
 
         
@@ -188,17 +198,13 @@ async function player( id, language ) {
 		if( !player || player.length === 0 ) { 
 		    
 			/** If not found or expired, fetch new from API and save to cache */
-			player = allycode ? 
-			    await swgoh.fetchPlayer({ allycodes:[allycode], language:language, enums:true }) :
-			    await swgoh.fetchPlayer({ discordIds:[discordId], language:language, enums:true });
-
+			player = await swgoh.fetchPlayer({ allycodes:allycodes, discordIds:discordIds, language:language, enums:true });
 			if( !player || player.length === 0 ) { 
 				throw new Error('No player found'); 
 			} 
 			
 			//if( discordId ) { player[0].discordId = discordId; }
 			for( let p of player ) {
-			    p.updated = p.updated || (new Date()).getTime();
 			    p = await cache.put('swapi', 'players', {allyCode:p.allyCode}, p);
 			}
 			
@@ -206,7 +212,8 @@ async function player( id, language ) {
         
 		return Array.isArray(player) ? player[0] : player;
 		
-	} catch(e) { 
+	} catch(e) {
+	    console.log(e);
 		throw e; 
 	}    		
 
@@ -221,7 +228,7 @@ async function player( id, language ) {
  *  @id - allycode or discordId (! discord Id requires patreon-tier api user)
  *  @language - language code for reply
  */
-async function guild( id, language ) {
+async function getguild( id, language ) {
 	
 	try {
 
@@ -234,27 +241,22 @@ async function guild( id, language ) {
 		let guild  = await cache.get('swapi', 'guilds', {name:player.guildName, updated:{ $gte:expiredDate.getTime() }});
 
 		/** Check if existance and expiration */
-		if( !guild || !guild[0] ) { 
+        if( !guild || guild.length === 0 ) { 
 
 			/** If not found or expired, fetch new from API and save to cache */
-			guild = await swgoh.fetchGuild({ allycode:player.allyCode, language:language, enums:true });
+			guild = await swgoh.fetchGuild({ allycodes:[player.allyCode], language:language, enums:true });
 			guild = await cache.put('swapi', 'guilds', {name:guild[0].name}, guild[0]);
 			
-			if( !player || player.length === 0 ) { 
+			if( !guild || guild.length === 0 ) { 
 				throw new Error('No guild found'); 
 			} 
 			
-			let groster = await swgoh.fetchGuild({ allycode:player.allyCode, language:language, enums:true, roster:true });
-			for( let p of groster.roster ) {
-			    p.updated = p.updated || (new Date()).getTime();
-			    p = await cache.put('swapi', 'players', {allyCode:p.allyCode}, p);
-			}
+			//let acs = guild.roster.map(r => r.allyCode);
+			//await getplayer( acs, language );
 			
-		} else {
-		    guild = guild[0];
-		}
+		} 
 		
-		return guild;
+		return Array.isArray(guild) ? guild[0] : guild;
 		
 	} catch(e) { 
 		throw e; 

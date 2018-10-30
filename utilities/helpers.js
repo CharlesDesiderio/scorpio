@@ -264,7 +264,7 @@ module.exports = {
 	    if( await message.channel.permissionsFor(await message.guild.me).has('ADD_REACTIONS') ) {
 	        message.react('⛔');
 	    }
-		return await message.reply(error.message);
+		return await message.reply(error.message+'\n'+error.description);
 	},
 	
 	checkClientPermissions: async ( client, message ) => {

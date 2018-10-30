@@ -22,6 +22,7 @@ module.exports = async ( client ) => {
 		client.log = require(client.folders.utilities+'logs.js')( client );		
 		
 		/** INIT SWGOH SERVICE */
+		//const ApiSwgohHelp = require('./api-swgoh-help.js');
 		const ApiSwgohHelp = require('api-swgoh-help');
 		client.swgoh = new ApiSwgohHelp(client.settings.swapi);
 		client.swapi = await require(client.folders.utilities+'swapi.js')( client );
